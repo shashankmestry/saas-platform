@@ -1,0 +1,7 @@
+fastapi
+pydantic-settings
+uvicorn[standard]
+
+[dev]
+httpx
+pytest

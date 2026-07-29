@@ -1,0 +1,40 @@
+Metadata-Version: 2.4
+Name: saas-platform-backend
+Version: 0.1.0
+Summary: Production-ready FastAPI foundation for the SaaS platform.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi
+Requires-Dist: pydantic-settings
+Requires-Dist: uvicorn[standard]
+Provides-Extra: dev
+Requires-Dist: httpx; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+
+# Backend
+
+Minimal, production-ready FastAPI foundation for the SaaS platform.
+
+## Structure
+
+```text
+backend/
+|-- app/
+|   |-- api/
+|   |   `-- v1/
+|   |       |-- api.py
+|   |       `-- endpoints/
+|   |           |-- health.py
+|   |           `-- root.py
+|   |-- core/
+|   |   |-- config.py
+|   |   |-- lifespan.py
+|   |   `-- logging.py
+|   `-- shared/
+|       `-- responses.py
+|-- requirements/
+|-- tests/
+|-- .env.example
+|-- pyproject.toml
+`-- README.md
+```
