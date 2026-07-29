@@ -1,15 +1,28 @@
-# Python cache
+# Virtual Environment
+.venv/
+
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
 
-# Virtual environments
-.venv/
-venv/
+# Distribution
+build/
+dist/
+*.egg-info/
 
-# Test and coverage artifacts
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Local environment files
+# IDE
+.vscode/
+.idea/
+
+# Environment
 .env
+.env.local
+
+# macOS
+.DS_Store
