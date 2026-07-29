@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, alias="API_PORT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     api_v1_prefix: str = Field(default="/api/v1", alias="API_PREFIX")
+    database_url: str = Field(
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/saas_platform",
+        alias="DATABASE_URL",
+    )
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:3000",

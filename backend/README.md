@@ -14,6 +14,8 @@ cp .env.example .env
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+Database configuration is loaded from `DATABASE_URL` in `.env`.
+
 The API will be available at:
 
 - `http://localhost:8000/`
@@ -32,10 +34,17 @@ backend/
 |   |           `-- root.py
 |   |-- core/
 |   |   |-- config.py
+|   |   |-- database.py
 |   |   |-- lifespan.py
 |   |   `-- logging.py
+|   |-- db/
+|   |   `-- base.py
 |   `-- shared/
 |       `-- responses.py
+|-- alembic/
+|   |-- env.py
+|   `-- versions/
+|-- alembic.ini
 |-- requirements/
 |-- tests/
 |-- .env.example
