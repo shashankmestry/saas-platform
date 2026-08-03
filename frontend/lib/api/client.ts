@@ -12,6 +12,8 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(async (config) => {
   const supabase = createSupabaseBrowserClient();
+
+  // Read the current Supabase session (cookie-backed). Do not cache tokens separately.
   const {
     data: { session },
   } = await supabase.auth.getSession();

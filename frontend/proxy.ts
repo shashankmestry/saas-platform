@@ -1,11 +1,13 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+
+import { updateSession } from "@/lib/supabase/proxy";
 
 /**
- * Frontend proxy foundation.
- * Authentication and route protection will be added in a later step.
+ * Next.js proxy entrypoint.
+ * Refreshes the Supabase session and protects authenticated routes.
  */
-export function proxy(_request: NextRequest) {
-  return NextResponse.next();
+export async function proxy(request: NextRequest) {
+  return updateSession(request);
 }
 
 export const config = {

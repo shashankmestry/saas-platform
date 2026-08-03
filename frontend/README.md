@@ -110,7 +110,15 @@ frontend/
 - `/auth/login` — sign in
 - `/auth/register` — create account (email verification required)
 - `/auth/callback` — email verification return URL
-- `/dashboard` — temporary authenticated dashboard
+- `/dashboard` — temporary authenticated dashboard (proxy-protected)
+
+## Session persistence
+
+- Browser client: `lib/supabase/client.ts` (`@supabase/ssr` cookies)
+- Server client: `lib/supabase/server.ts`
+- Proxy: `proxy.ts` + `lib/supabase/proxy.ts` refreshes/validates the session with
+  `getClaims()` and redirects unauthenticated users away from `/dashboard`
+- Axios reads the access token from the current Supabase session on each request
 
 ## Email verification
 
