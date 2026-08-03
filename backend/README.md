@@ -24,7 +24,18 @@ The API will be available at:
 
 - `http://localhost:8000/`
 - `http://localhost:8000/api/v1/health`
-- `http://localhost:8000/api/v1/auth/me` — returns JWT identity (`id`, `email`, `role`)
+- `http://localhost:8000/api/v1/auth/me` — returns the platform user (JIT on first login)
+- `http://localhost:8000/docs` — Swagger UI
+
+## API
+
+| Method | Path | Auth | Description |
+| ------ | ---- | ---- | ----------- |
+| `GET` | `/` | No | Service info (`name`, `version`, `status`) |
+| `GET` | `/api/v1/health` | No | Health check (`{"status":"healthy"}`) |
+| `GET` | `/api/v1/auth/me` | Bearer JWT | Current platform user (JIT provisioning) |
+
+Full request/response details: [docs/API.md](../docs/API.md)
 
 ### Database migrations
 
@@ -63,7 +74,6 @@ backend/
 |   |       |-- exceptions.py
 |   |       |-- models.py
 |   |       |-- repository.py
-|   |       |-- router.py
 |   |       |-- schemas.py
 |   |       `-- service.py
 |   `-- shared/

@@ -10,11 +10,8 @@ class UserService:
     def __init__(self, repository: UserRepository) -> None:
         self._repository = repository
 
-    async def get_or_create_from_auth(
-        self,
-        authenticated_user: AuthenticatedUser,
-    ) -> User:
-        auth_user_id = UUID(authenticated_user.id)
+    async def get_or_create_user(self, identity: AuthenticatedUser) -> User:
+        auth_user_id = UUID(identity.id)
         existing_user = await self._repository.get_by_auth_user_id(auth_user_id)
         if existing_user is not None:
             if not existing_user.is_active:
@@ -23,7 +20,7 @@ class UserService:
 
         user = User(
             auth_user_id=auth_user_id,
-            email=authenticated_user.email,
+            email=str(identity.email),
             display_name=None,
             avatar_url=None,
         )
