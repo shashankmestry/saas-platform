@@ -1,9 +1,11 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,12 +13,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { organizationKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
 import { fetchCurrentUser, logout } from "@/services/auth";
+import { leaveOrganization } from "@/services/memberships";
+import { listOrganizations } from "@/services/organizations";
 import { useAuthStore } from "@/store/auth";
 
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const session = useAuthStore((state) => state.session);
   const user = useAuthStore((state) => state.user);
   const isHydrated = useAuthStore((state) => state.isHydrated);
@@ -25,6 +32,14 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [verifiedMessage, setVerifiedMessage] = useState<string | null>(null);
+
+  const organizationsQuery = useQuery({
+    queryKey: organizationKeys.list(),
+    queryFn: listOrganizations,
+    enabled: isHydrated && Boolean(session),
+  });
+
+  const organization = organizationsQuery.data?.[0] ?? null;
 
   useEffect(() => {
     if (searchParams.get("verified") === "1") {
@@ -42,7 +57,19 @@ function DashboardContent() {
       return;
     }
 
-    if (user) {
+    if (organizationsQuery.isSuccess && (organizationsQuery.data?.length ?? 0) === 0) {
+      router.replace("/onboarding");
+    }
+  }, [
+    isHydrated,
+    organizationsQuery.data,
+    organizationsQuery.isSuccess,
+    router,
+    session,
+  ]);
+
+  useEffect(() => {
+    if (!isHydrated || !session || user) {
       return;
     }
 
@@ -70,7 +97,24 @@ function DashboardContent() {
     return () => {
       isMounted = false;
     };
-  }, [isHydrated, router, session, setUser, user]);
+  }, [isHydrated, session, setUser, user]);
+
+  const leaveMutation = useMutation({
+    mutationFn: () => leaveOrganization(organization!.id),
+    onSuccess: async () => {
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: organizationKeys.list() });
+      const organizations = await listOrganizations();
+      if (organizations.length === 0) {
+        router.replace("/onboarding");
+        return;
+      }
+      router.refresh();
+    },
+    onError: (leaveError: Error) => {
+      setError(leaveError.message);
+    },
+  });
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -88,7 +132,23 @@ function DashboardContent() {
     }
   }
 
-  if (!isHydrated || (session && !user && !error)) {
+  function handleLeave() {
+    if (!organization) {
+      return;
+    }
+    const confirmed = window.confirm(
+      `Leave ${organization.name}?\n\nYou will lose access to this organization.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+    leaveMutation.mutate();
+  }
+
+  if (
+    !isHydrated ||
+    (session && organizationsQuery.isLoading && !error)
+  ) {
     return (
       <main className="flex flex-1 items-center justify-center px-6 py-16">
         <p className="text-muted-foreground text-sm">Loading dashboard...</p>
@@ -115,6 +175,14 @@ function DashboardContent() {
           ) : null}
 
           <div className="space-y-1">
+            <p className="text-muted-foreground text-sm">Organization</p>
+            <p className="font-medium">{organization?.name ?? "—"}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-sm">Role</p>
+            <p className="font-medium capitalize">{organization?.role ?? "—"}</p>
+          </div>
+          <div className="space-y-1">
             <p className="text-muted-foreground text-sm">Email</p>
             <p className="font-medium">{user?.email ?? session.user.email}</p>
           </div>
@@ -129,13 +197,34 @@ function DashboardContent() {
             </p>
           ) : null}
 
-          <Button
-            variant="outline"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-          >
-            {isLoggingOut ? "Signing out..." : "Logout"}
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/dashboard/members"
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
+              Members
+            </Link>
+            <Link
+              href="/dashboard/settings/organization"
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
+              Organization settings
+            </Link>
+            <Button
+              variant="outline"
+              onClick={handleLeave}
+              disabled={!organization || leaveMutation.isPending}
+            >
+              {leaveMutation.isPending ? "Leaving..." : "Leave organization"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              {isLoggingOut ? "Signing out..." : "Logout"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </main>

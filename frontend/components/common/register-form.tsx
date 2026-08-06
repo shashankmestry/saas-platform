@@ -2,8 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,17 +17,23 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  buildLoginPath,
+  getSafeReturnPath,
+} from "@/lib/auth/return-path";
 import { registerSchema, type RegisterFormValues } from "@/lib/auth/schemas";
 import { cn } from "@/lib/utils";
 import { fetchCurrentUser, registerWithEmail } from "@/services/auth";
 import { useAuthStore } from "@/store/auth";
 
-export function RegisterForm() {
+function RegisterFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setSession = useAuthStore((state) => state.setSession);
   const setUser = useAuthStore((state) => state.setUser);
   const [authError, setAuthError] = useState<string | null>(null);
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
+  const nextPath = getSafeReturnPath(searchParams.get("next"));
 
   const {
     register,
@@ -47,7 +53,7 @@ export function RegisterForm() {
     setAuthError(null);
 
     try {
-      const result = await registerWithEmail(values);
+      const result = await registerWithEmail(values, { returnPath: nextPath });
 
       if (result.requiresEmailConfirmation || !result.session) {
         setRegisteredEmail(values.email);
@@ -57,7 +63,7 @@ export function RegisterForm() {
       setSession(result.session);
       const platformUser = await fetchCurrentUser();
       setUser(platformUser);
-      router.replace("/dashboard");
+      router.replace(nextPath ?? "/dashboard");
     } catch (error) {
       setAuthError(
         error instanceof Error ? error.message : "Unable to create account",
@@ -66,6 +72,10 @@ export function RegisterForm() {
   }
 
   if (registeredEmail) {
+    const afterVerifyMessage = nextPath?.startsWith("/invitations/accept")
+      ? "After you verify, you will be returned to the invitation to join the organization."
+      : "Open the link in that email to verify your address. You will be signed in automatically and redirected to your dashboard.";
+
     return (
       <Card className="w-full max-w-md">
         <CardHeader>
@@ -79,17 +89,14 @@ export function RegisterForm() {
             A verification email was sent to{" "}
             <span className="font-medium">{registeredEmail}</span>.
           </p>
-          <p className="text-muted-foreground text-sm">
-            Open the link in that email to verify your address. You will be
-            signed in automatically and redirected to your dashboard.
-          </p>
+          <p className="text-muted-foreground text-sm">{afterVerifyMessage}</p>
           <p className="text-muted-foreground text-sm">
             If you do not see the email, check your spam folder.
           </p>
         </CardContent>
         <CardFooter className="flex flex-wrap gap-3">
           <Link
-            href="/auth/login"
+            href={buildLoginPath(nextPath)}
             className={cn(buttonVariants({ size: "lg" }))}
           >
             Go to sign in
@@ -187,11 +194,22 @@ export function RegisterForm() {
       <CardFooter className="justify-center">
         <p className="text-muted-foreground text-sm">
           Already have an account?{" "}
-          <Link className="text-foreground underline underline-offset-4" href="/auth/login">
+          <Link
+            className="text-foreground underline underline-offset-4"
+            href={buildLoginPath(nextPath)}
+          >
             Sign in
           </Link>
         </p>
       </CardFooter>
     </Card>
+  );
+}
+
+export function RegisterForm() {
+  return (
+    <Suspense fallback={<Card className="w-full max-w-md" />}>
+      <RegisterFormContent />
+    </Suspense>
   );
 }

@@ -2,13 +2,27 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { API_URL } from "@/lib/constants";
+import { getSafeReturnPath } from "@/lib/auth/return-path";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+
+function buildPostAuthRedirect(origin: string, nextParam: string | null): URL {
+  const safeNext = getSafeReturnPath(nextParam);
+
+  if (safeNext) {
+    return new URL(safeNext, origin);
+  }
+
+  const dashboardUrl = new URL("/dashboard", origin);
+  dashboardUrl.searchParams.set("verified", "1");
+  return dashboardUrl;
+}
 
 export async function GET(request: NextRequest) {
   const requestUrl = request.nextUrl;
   const code = requestUrl.searchParams.get("code");
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
+  const nextParam = requestUrl.searchParams.get("next");
   const origin = requestUrl.origin;
 
   if (error) {
@@ -18,6 +32,10 @@ export async function GET(request: NextRequest) {
       errorDescription?.replace(/\+/g, " ") ||
         "Email verification failed. Please try again.",
     );
+    const safeNext = getSafeReturnPath(nextParam);
+    if (safeNext) {
+      loginUrl.searchParams.set("next", safeNext);
+    }
     return NextResponse.redirect(loginUrl);
   }
 
@@ -27,13 +45,15 @@ export async function GET(request: NextRequest) {
       "error",
       "Missing verification code. Open the link from your email again.",
     );
+    const safeNext = getSafeReturnPath(nextParam);
+    if (safeNext) {
+      loginUrl.searchParams.set("next", safeNext);
+    }
     return NextResponse.redirect(loginUrl);
   }
 
-  const dashboardUrl = new URL("/dashboard", origin);
-  dashboardUrl.searchParams.set("verified", "1");
-
-  let redirectResponse = NextResponse.redirect(dashboardUrl);
+  const destinationUrl = buildPostAuthRedirect(origin, nextParam);
+  let redirectResponse = NextResponse.redirect(destinationUrl);
   const { supabaseUrl, supabasePublishableKey } = getSupabaseEnv();
 
   const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
@@ -46,7 +66,7 @@ export async function GET(request: NextRequest) {
           request.cookies.set(name, value);
         });
 
-        redirectResponse = NextResponse.redirect(dashboardUrl);
+        redirectResponse = NextResponse.redirect(destinationUrl);
 
         cookiesToSet.forEach(({ name, value, options }) => {
           redirectResponse.cookies.set(name, value, options);
@@ -65,6 +85,10 @@ export async function GET(request: NextRequest) {
       exchangeError?.message ||
         "Unable to complete email verification. Please sign in.",
     );
+    const safeNext = getSafeReturnPath(nextParam);
+    if (safeNext) {
+      loginUrl.searchParams.set("next", safeNext);
+    }
     return NextResponse.redirect(loginUrl);
   }
 
@@ -77,7 +101,7 @@ export async function GET(request: NextRequest) {
       cache: "no-store",
     });
   } catch {
-    // Dashboard can retry JIT provisioning if this request fails.
+    // Destination page can retry JIT provisioning if this request fails.
   }
 
   return redirectResponse;

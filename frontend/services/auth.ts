@@ -3,6 +3,7 @@ import axios from "axios";
 
 import { apiClient } from "@/lib/api/client";
 import { APP_URL, AUTH_CALLBACK_PATH } from "@/lib/constants";
+import { getSafeReturnPath } from "@/lib/auth/return-path";
 import type { LoginFormValues, RegisterFormValues } from "@/lib/auth/schemas";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { ApiError, PlatformUser } from "@/types";
@@ -19,19 +20,30 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function getAuthCallbackUrl(): string {
-  return `${APP_URL.replace(/\/$/, "")}${AUTH_CALLBACK_PATH}`;
+export function getAuthCallbackUrl(returnPath?: string | null): string {
+  const base = `${APP_URL.replace(/\/$/, "")}${AUTH_CALLBACK_PATH}`;
+  const safe = getSafeReturnPath(returnPath);
+
+  if (!safe) {
+    return base;
+  }
+
+  const url = new URL(base);
+  url.searchParams.set("next", safe);
+  return url.toString();
 }
 
 export async function registerWithEmail(
   values: RegisterFormValues,
+  options?: { returnPath?: string | null },
 ): Promise<{ session: Session | null; requiresEmailConfirmation: boolean }> {
   const supabase = createSupabaseBrowserClient();
   const { data, error } = await supabase.auth.signUp({
     email: values.email,
     password: values.password,
     options: {
-      emailRedirectTo: getAuthCallbackUrl(),
+      // Preserve invitation/return path through email verification.
+      emailRedirectTo: getAuthCallbackUrl(options?.returnPath),
       data: {
         full_name: values.fullName,
       },

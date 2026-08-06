@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.users.models import User
+from app.shared.email import normalize_email
 
 
 class UserRepository:
@@ -12,6 +13,12 @@ class UserRepository:
 
     async def get_by_auth_user_id(self, auth_user_id: UUID) -> User | None:
         statement = select(User).where(User.auth_user_id == auth_user_id)
+        result = await self._session.execute(statement)
+        return result.scalar_one_or_none()
+
+    async def get_by_email(self, email: str) -> User | None:
+        normalized = normalize_email(email)
+        statement = select(User).where(func.lower(func.trim(User.email)) == normalized)
         result = await self._session.execute(statement)
         return result.scalar_one_or_none()
 

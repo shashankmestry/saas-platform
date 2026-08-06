@@ -25,6 +25,20 @@ class Settings(BaseSettings):
     database_url: str = Field(alias="DATABASE_URL")
     supabase_url: str = Field(alias="SUPABASE_URL")
     supabase_publishable_key: str = Field(alias="SUPABASE_PUBLISHABLE_KEY")
+    supabase_secret_key: str = Field(alias="SUPABASE_SECRET_KEY")
+    organization_assets_bucket: str = Field(
+        default="organization-assets",
+        alias="ORGANIZATION_ASSETS_BUCKET",
+    )
+    logo_signed_url_ttl_seconds: int = Field(
+        default=900,
+        alias="LOGO_SIGNED_URL_TTL_SECONDS",
+    )
+    frontend_app_url: str = Field(
+        default="http://localhost:3000",
+        alias="FRONTEND_APP_URL",
+    )
+    invitation_expiry_days: int = Field(default=7, alias="INVITATION_EXPIRY_DAYS")
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:3000",

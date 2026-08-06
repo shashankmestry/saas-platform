@@ -18,6 +18,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { loginSchema, type LoginFormValues } from "@/lib/auth/schemas";
+import {
+  buildRegisterPath,
+  getSafeReturnPath,
+} from "@/lib/auth/return-path";
 import { fetchCurrentUser, loginWithEmail } from "@/services/auth";
 import { useAuthStore } from "@/store/auth";
 
@@ -27,6 +31,7 @@ function LoginFormContent() {
   const setSession = useAuthStore((state) => state.setSession);
   const setUser = useAuthStore((state) => state.setUser);
   const [authError, setAuthError] = useState<string | null>(null);
+  const nextPath = getSafeReturnPath(searchParams.get("next"));
 
   const {
     register,
@@ -57,7 +62,7 @@ function LoginFormContent() {
       const platformUser = await fetchCurrentUser();
       setUser(platformUser);
 
-      router.replace("/dashboard");
+      router.replace(nextPath ?? "/dashboard");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to sign in";
@@ -127,7 +132,10 @@ function LoginFormContent() {
       <CardFooter className="justify-center">
         <p className="text-muted-foreground text-sm">
           Need an account?{" "}
-          <Link className="text-foreground underline underline-offset-4" href="/auth/register">
+          <Link
+            className="text-foreground underline underline-offset-4"
+            href={buildRegisterPath(nextPath)}
+          >
             Create account
           </Link>
         </p>

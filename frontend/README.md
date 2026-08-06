@@ -82,6 +82,7 @@ frontend/
 |   |-- (auth)/auth/login/
 |   |-- (auth)/auth/register/
 |   |-- (dashboard)/dashboard/
+|   |-- (dashboard)/onboarding/
 |   `-- api/
 |-- components/
 |   |-- ui/
@@ -91,6 +92,7 @@ frontend/
 |-- lib/
 |   |-- api/
 |   |-- auth/
+|   |-- organizations/
 |   |-- supabase/
 |   |-- utils/
 |   `-- constants/
@@ -110,14 +112,18 @@ frontend/
 - `/auth/login` — sign in
 - `/auth/register` — create account (email verification required)
 - `/auth/callback` — email verification return URL
-- `/dashboard` — temporary authenticated dashboard (proxy-protected)
+- `/onboarding` — create organization when the user has none
+- `/dashboard` — temporary authenticated dashboard (shows organization name)
+- `/dashboard/members` — members, pending invitations, invite form
+- `/invitations/accept` — accept invitation via `?token=`
 
 ## Session persistence
 
 - Browser client: `lib/supabase/client.ts` (`@supabase/ssr` cookies)
 - Server client: `lib/supabase/server.ts`
 - Proxy: `proxy.ts` + `lib/supabase/proxy.ts` refreshes/validates the session with
-  `getClaims()` and redirects unauthenticated users away from `/dashboard`
+  `getClaims()` and redirects unauthenticated users away from `/dashboard` and
+  `/onboarding`
 - Axios reads the access token from the current Supabase session on each request
 
 ## Email verification
@@ -127,7 +133,7 @@ frontend/
 3. Supabase sends a verification email with redirect to `/auth/callback`
 4. The server route exchanges the auth code for a session
 5. Backend `GET /api/v1/auth/me` runs JIT provisioning
-6. User is redirected to `/dashboard`
+6. User is redirected to `/dashboard` (then `/onboarding` if they have no organization)
 
 Add this redirect URL in the Supabase dashboard under Authentication → URL configuration:
 
