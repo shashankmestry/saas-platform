@@ -19,6 +19,7 @@ from app.modules.memberships.exceptions import (
     InvitationRevokedError,
     LastOwnerInvariantError,
     MembershipNotFoundError,
+    OrganizationMemberLimitReachedError,
     PendingInvitationExistsError,
 )
 from app.modules.memberships.schemas import (
@@ -30,6 +31,7 @@ from app.modules.memberships.schemas import (
     OwnershipTransferRequest,
 )
 from app.modules.memberships.service import MembershipService
+from app.modules.plans.exceptions import OrganizationPlanNotFoundError
 from app.modules.users.models import User
 
 organization_memberships_router = APIRouter()
@@ -238,6 +240,16 @@ async def create_organization_invitation(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
+        ) from exc
+    except OrganizationMemberLimitReachedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except OrganizationPlanNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Organization plan configuration is incomplete",
         ) from exc
 
     response = InvitationResponse.model_validate(invitation)

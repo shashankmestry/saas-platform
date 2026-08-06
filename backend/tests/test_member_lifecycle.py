@@ -92,6 +92,7 @@ def _service(memberships: list) -> tuple[MembershipService, FakeMembershipReposi
         membership_repository=repository,
         invitation_repository=SimpleNamespace(),
         user_repository=SimpleNamespace(),
+        plan_repository=SimpleNamespace(),
         settings=SimpleNamespace(),
     )
     return service, repository, session

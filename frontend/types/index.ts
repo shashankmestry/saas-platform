@@ -26,6 +26,8 @@ export type {
   OrganizationProfileUpdate,
 } from "@/types/organization-profile";
 
+export type { OrganizationPlan } from "@/types/organization-plan";
+
 export type OrganizationMember = {
   id: string;
   user_id: string;

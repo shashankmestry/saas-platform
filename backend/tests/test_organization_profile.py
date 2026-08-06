@@ -108,6 +108,7 @@ def _service(
         organization_repository=FakeOrganizationRepository([organization]),
         membership_repository=SimpleNamespace(),
         profile_repository=profile_repository,
+        plan_repository=SimpleNamespace(),
         storage=storage,
     )
     return service, profile_repository, session

@@ -15,6 +15,7 @@ from app.modules.organizations.repository import (
     OrganizationRepository,
 )
 from app.modules.organizations.service import OrganizationService
+from app.modules.plans.repository import OrganizationPlanRepository
 
 
 async def get_organization_repository(
@@ -33,6 +34,12 @@ async def get_membership_repository(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> MembershipRepository:
     return MembershipRepository(session)
+
+
+async def get_organization_plan_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> OrganizationPlanRepository:
+    return OrganizationPlanRepository(session)
 
 
 async def get_organization_storage(
@@ -55,6 +62,10 @@ async def get_organization_service(
         OrganizationProfileRepository,
         Depends(get_organization_profile_repository),
     ],
+    plan_repository: Annotated[
+        OrganizationPlanRepository,
+        Depends(get_organization_plan_repository),
+    ],
     storage: Annotated[
         OrganizationAssetsStorage,
         Depends(get_organization_storage),
@@ -65,5 +76,6 @@ async def get_organization_service(
         organization_repository=organization_repository,
         membership_repository=membership_repository,
         profile_repository=profile_repository,
+        plan_repository=plan_repository,
         storage=storage,
     )

@@ -7,6 +7,7 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_db_session
 from app.modules.memberships.repository import InvitationRepository, MembershipRepository
 from app.modules.memberships.service import MembershipService
+from app.modules.plans.repository import OrganizationPlanRepository
 from app.modules.users.dependencies import get_user_repository
 from app.modules.users.repository import UserRepository
 
@@ -23,6 +24,12 @@ async def get_invitation_repository(
     return InvitationRepository(session)
 
 
+async def get_organization_plan_repository_for_memberships(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> OrganizationPlanRepository:
+    return OrganizationPlanRepository(session)
+
+
 async def get_membership_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     membership_repository: Annotated[
@@ -34,6 +41,10 @@ async def get_membership_service(
         Depends(get_invitation_repository),
     ],
     user_repository: Annotated[UserRepository, Depends(get_user_repository)],
+    plan_repository: Annotated[
+        OrganizationPlanRepository,
+        Depends(get_organization_plan_repository_for_memberships),
+    ],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> MembershipService:
     return MembershipService(
@@ -41,5 +52,6 @@ async def get_membership_service(
         membership_repository=membership_repository,
         invitation_repository=invitation_repository,
         user_repository=user_repository,
+        plan_repository=plan_repository,
         settings=settings,
     )

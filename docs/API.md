@@ -266,6 +266,54 @@ Same shape as `GET .../profile`.
 
 ---
 
+### `GET /api/v1/organizations/{organization_id}/plan`
+
+Returns the organization's assigned plan plus code-defined entitlements and
+current seat usage.
+
+Requires `organization.view`.
+
+Plan definitions (features/limits) are code-defined. Only the plan assignment
+is stored in the database. Limit values use `null` to mean **unlimited**.
+
+There is no public HTTP endpoint to change plans in this step.
+
+**Auth:** required (`Bearer` token)
+
+**Response `200`**
+
+```json
+{
+  "plan": "free",
+  "features": {
+    "analytics.basic": true,
+    "analytics.advanced": false,
+    "support.priority": false
+  },
+  "limits": {
+    "organization.members": 3
+  },
+  "usage": {
+    "organization.members": 1
+  }
+}
+```
+
+Seat usage (`organization.members`) is:
+
+active memberships + active pending invitations
+
+**Errors**
+
+| Status | When |
+| ------ | ---- |
+| `401` | Missing, invalid, or expired token |
+| `403` | Not a member, or missing `organization.view` |
+| `404` | Plan assignment missing |
+| `500` | Unknown persisted plan key |
+
+---
+
 ### `POST /api/v1/organizations/{organization_id}/logo/upload`
 
 Authorizes a short-lived Supabase Storage signed upload for an organization
@@ -400,6 +448,10 @@ Lists members of an organization. Requires `member.view`.
 
 Creates a pending member invitation. Requires `member.invite`. Invitation role is always `member`.
 
+Also enforces the organization's `organization.members` plan seat limit.
+Seat usage = active memberships + active pending invitations. Concurrent
+invitation creation is serialized on the organization's plan row.
+
 In `APP_ENV=development`, the response may include `invite_url` with the raw token for local testing. Production responses never include raw tokens or invite URLs.
 
 **Auth:** required (`Bearer` token)
@@ -431,7 +483,7 @@ In `APP_ENV=development`, the response may include `invite_url` with the raw tok
 | Status | When |
 | ------ | ---- |
 | `401` | Missing, invalid, or expired token |
-| `403` | Not a member, or missing `member.invite` |
+| `403` | Missing `member.invite`, or member seat limit reached for the current plan |
 | `409` | Email already a member, or pending invitation exists |
 | `422` | Invalid email |
 

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { OrganizationLogoSection } from "@/components/common/organization-logo-section";
+import { OrganizationPlanSection } from "@/components/common/organization-plan-section";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -242,11 +243,17 @@ export function OrganizationSettingsContent() {
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
             {organization ? (
-              <OrganizationLogoSection
-                organizationId={organization.id}
-                logoUrl={profileQuery.data?.logo_url ?? null}
-                canManage={canManage}
-              />
+              <>
+                <OrganizationPlanSection
+                  organizationId={organization.id}
+                  enabled={canView}
+                />
+                <OrganizationLogoSection
+                  organizationId={organization.id}
+                  logoUrl={profileQuery.data?.logo_url ?? null}
+                  canManage={canManage}
+                />
+              </>
             ) : null}
 
             <div className="space-y-2">

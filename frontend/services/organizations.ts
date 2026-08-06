@@ -5,6 +5,7 @@ import type {
   LogoUploadAuthorization,
   LogoUploadRequest,
   Organization,
+  OrganizationPlan,
   OrganizationProfile,
   OrganizationProfileUpdate,
 } from "@/types";
@@ -126,5 +127,18 @@ export async function deleteOrganizationLogo(
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, "Unable to remove organization logo"));
+  }
+}
+
+export async function getOrganizationPlan(
+  organizationId: string,
+): Promise<OrganizationPlan> {
+  try {
+    const response = await apiClient.get<OrganizationPlan>(
+      `/api/v1/organizations/${organizationId}/plan`,
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "Unable to load organization plan"));
   }
 }

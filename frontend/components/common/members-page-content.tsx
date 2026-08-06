@@ -122,6 +122,9 @@ export function MembersPageContent() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: organizationKeys.list() }),
       queryClient.invalidateQueries({
+        queryKey: organizationKeys.plan(organization.id),
+      }),
+      queryClient.invalidateQueries({
         queryKey: membershipKeys.members(organization.id),
       }),
       queryClient.invalidateQueries({

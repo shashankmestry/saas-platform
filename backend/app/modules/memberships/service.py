@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.authorization import OrganizationRole, parse_organization_role
 from app.core.config import Settings
+from app.core.plans import Limit, plan_get_limit
 from app.modules.memberships.exceptions import (
     AlreadyOrganizationMemberError,
     InvalidMembershipOperationError,
@@ -17,12 +18,19 @@ from app.modules.memberships.exceptions import (
     InvitationRevokedError,
     LastOwnerInvariantError,
     MembershipNotFoundError,
+    OrganizationMemberLimitReachedError,
     PendingInvitationExistsError,
 )
 from app.modules.memberships.models import OrganizationInvitation, OrganizationMembership
 from app.modules.memberships.repository import InvitationRepository, MembershipRepository
 from app.modules.memberships.schemas import OrganizationMemberResponse
 from app.modules.memberships.tokens import generate_invitation_token, hash_invitation_token
+from app.modules.plans.exceptions import (
+    OrganizationPlanNotFoundError,
+    UnknownOrganizationPlanError,
+)
+from app.modules.plans.repository import OrganizationPlanRepository
+from app.modules.plans.service import PlanService
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 from app.shared.email import normalize_email
@@ -30,6 +38,10 @@ from app.shared.email import normalize_email
 _LAST_OWNER_MESSAGE = (
     "Organization must always have at least one owner. "
     "Transfer ownership or promote another member first."
+)
+
+_MEMBER_LIMIT_MESSAGE = (
+    "Organization member limit reached for the current plan."
 )
 
 
@@ -40,13 +52,21 @@ class MembershipService:
         membership_repository: MembershipRepository,
         invitation_repository: InvitationRepository,
         user_repository: UserRepository,
+        plan_repository: OrganizationPlanRepository,
         settings: Settings,
     ) -> None:
         self._session = session
         self._membership_repository = membership_repository
         self._invitation_repository = invitation_repository
         self._user_repository = user_repository
+        self._plan_repository = plan_repository
         self._settings = settings
+        self._plan_service = PlanService(
+            session=session,
+            plan_repository=plan_repository,
+            membership_repository=membership_repository,
+            invitation_repository=invitation_repository,
+        )
 
     async def list_members(
         self,
@@ -83,43 +103,66 @@ class MembershipService:
     ) -> tuple[OrganizationInvitation, str | None]:
         normalized_email = normalize_email(email)
 
-        existing_user = await self._user_repository.get_by_email(normalized_email)
-        if existing_user is not None:
-            membership = await self._membership_repository.get_by_organization_and_user(
+        try:
+            # Serialize seat-limit checks on the organization plan row.
+            plan_row = await self._plan_repository.get_by_organization_id_for_update(
                 organization_id,
-                existing_user.id,
             )
-            if membership is not None:
-                raise AlreadyOrganizationMemberError(
-                    "User is already a member of this organization",
+            if plan_row is None:
+                raise OrganizationPlanNotFoundError(
+                    "Organization plan assignment was not found",
+                )
+            try:
+                plan_key = self._plan_service.resolve_plan_key(plan_row.plan_key)
+            except UnknownOrganizationPlanError:
+                raise OrganizationMemberLimitReachedError(_MEMBER_LIMIT_MESSAGE) from None
+
+            member_limit = plan_get_limit(plan_key, Limit.ORGANIZATION_MEMBERS)
+            if member_limit is not None:
+                seat_usage = await self._plan_service.count_member_seats(organization_id)
+                if seat_usage >= member_limit:
+                    raise OrganizationMemberLimitReachedError(_MEMBER_LIMIT_MESSAGE)
+
+            existing_user = await self._user_repository.get_by_email(normalized_email)
+            if existing_user is not None:
+                membership = await self._membership_repository.get_by_organization_and_user(
+                    organization_id,
+                    existing_user.id,
+                )
+                if membership is not None:
+                    raise AlreadyOrganizationMemberError(
+                        "User is already a member of this organization",
+                    )
+
+            pending = await self._invitation_repository.get_pending_by_organization_and_email(
+                organization_id,
+                normalized_email,
+            )
+            if pending is not None:
+                raise PendingInvitationExistsError(
+                    "A pending invitation already exists for this email",
                 )
 
-        pending = await self._invitation_repository.get_pending_by_organization_and_email(
-            organization_id,
-            normalized_email,
-        )
-        if pending is not None:
-            raise PendingInvitationExistsError(
-                "A pending invitation already exists for this email",
+            raw_token = generate_invitation_token()
+            token_hash = hash_invitation_token(raw_token)
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                days=self._settings.invitation_expiry_days,
             )
 
-        raw_token = generate_invitation_token()
-        token_hash = hash_invitation_token(raw_token)
-        expires_at = datetime.now(timezone.utc) + timedelta(
-            days=self._settings.invitation_expiry_days,
-        )
-
-        invitation = OrganizationInvitation(
-            organization_id=organization_id,
-            email=normalized_email,
-            role=OrganizationRole.MEMBER.value,
-            token_hash=token_hash,
-            expires_at=expires_at,
-            created_by_user_id=user.id,
-        )
-        invitation = await self._invitation_repository.create(invitation)
-        await self._session.commit()
-        await self._session.refresh(invitation)
+            invitation = OrganizationInvitation(
+                organization_id=organization_id,
+                email=normalized_email,
+                role=OrganizationRole.MEMBER.value,
+                token_hash=token_hash,
+                expires_at=expires_at,
+                created_by_user_id=user.id,
+            )
+            invitation = await self._invitation_repository.create(invitation)
+            await self._session.commit()
+            await self._session.refresh(invitation)
+        except Exception:
+            await self._session.rollback()
+            raise
 
         invite_url: str | None = None
         if self._settings.app_env == "development":

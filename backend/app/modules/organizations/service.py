@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.authorization import OrganizationRole, permissions_for_role
+from app.core.plans import PlanKey
 from app.core.storage import (
     ALLOWED_LOGO_CONTENT_TYPES,
     MAX_LOGO_BYTES,
@@ -32,6 +33,8 @@ from app.modules.organizations.schemas import (
     OrganizationProfileUpdate,
     OrganizationResponse,
 )
+from app.modules.plans.models import OrganizationPlan
+from app.modules.plans.repository import OrganizationPlanRepository
 from app.modules.users.models import User
 
 
@@ -49,12 +52,14 @@ class OrganizationService:
         organization_repository: OrganizationRepository,
         membership_repository: MembershipRepository,
         profile_repository: OrganizationProfileRepository,
+        plan_repository: OrganizationPlanRepository,
         storage: OrganizationAssetsStorage,
     ) -> None:
         self._session = session
         self._organization_repository = organization_repository
         self._membership_repository = membership_repository
         self._profile_repository = profile_repository
+        self._plan_repository = plan_repository
         self._storage = storage
 
     async def list_for_user(self, user: User) -> list[OrganizationResponse]:
@@ -91,6 +96,12 @@ class OrganizationService:
                 membership = await self._membership_repository.create_owner_membership(
                     organization_id=organization.id,
                     user_id=user.id,
+                )
+                await self._plan_repository.create(
+                    OrganizationPlan(
+                        organization_id=organization.id,
+                        plan_key=PlanKey.FREE.value,
+                    )
                 )
                 await self._session.commit()
                 await self._session.refresh(organization)

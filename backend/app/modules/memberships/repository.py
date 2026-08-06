@@ -129,6 +129,13 @@ class MembershipRepository:
         result = await self._session.execute(statement)
         return int(result.scalar_one())
 
+    async def count_members(self, organization_id: UUID) -> int:
+        statement = select(func.count()).select_from(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+        )
+        result = await self._session.execute(statement)
+        return int(result.scalar_one())
+
     async def list_members_for_organization(
         self,
         organization_id: UUID,
@@ -215,3 +222,14 @@ class InvitationRepository:
         )
         result = await self._session.execute(statement)
         return list(result.scalars().all())
+
+    async def count_pending(self, organization_id: UUID) -> int:
+        now = datetime.now(timezone.utc)
+        statement = select(func.count()).select_from(OrganizationInvitation).where(
+            OrganizationInvitation.organization_id == organization_id,
+            OrganizationInvitation.accepted_at.is_(None),
+            OrganizationInvitation.revoked_at.is_(None),
+            OrganizationInvitation.expires_at > now,
+        )
+        result = await self._session.execute(statement)
+        return int(result.scalar_one())

@@ -3,6 +3,8 @@ export const organizationKeys = {
   list: () => [...organizationKeys.all, "list"] as const,
   profile: (organizationId: string) =>
     [...organizationKeys.all, "profile", organizationId] as const,
+  plan: (organizationId: string) =>
+    [...organizationKeys.all, "plan", organizationId] as const,
 };
 
 export const membershipKeys = {

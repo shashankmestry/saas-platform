@@ -44,3 +44,7 @@ class LastOwnerInvariantError(MembershipError):
 
 class InvalidMembershipOperationError(MembershipError):
     """Raised when a membership operation conflicts with current state."""
+
+
+class OrganizationMemberLimitReachedError(MembershipError):
+    """Raised when inviting would exceed the organization member seat limit."""
