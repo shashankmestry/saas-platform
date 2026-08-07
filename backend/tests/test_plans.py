@@ -185,12 +185,21 @@ async def test_new_organization_atomically_receives_free_plan():
     org_repo = FakeOrganizationRepository()
     membership_repo = FakeMembershipCountRepository()
     plan_repo = FakePlanRepository()
+    subscription_calls: list = []
+
+    async def create_initial_subscription(organization_id, **kwargs):
+        subscription_calls.append((organization_id, kwargs))
+        return SimpleNamespace(organization_id=organization_id)
+
     service = OrganizationService(
         session=session,
         organization_repository=org_repo,
         membership_repository=membership_repo,
         profile_repository=SimpleNamespace(),
         plan_repository=plan_repo,
+        subscription_service=SimpleNamespace(
+            create_initial_subscription=create_initial_subscription,
+        ),
         storage=SimpleNamespace(),
     )
     user = SimpleNamespace(id=uuid4())
@@ -203,6 +212,8 @@ async def test_new_organization_atomically_receives_free_plan():
     assert plan_repo.create_calls == 1
     assert plan_repo.plans[0].plan_key == PlanKey.FREE.value
     assert plan_repo.plans[0].organization_id == response.id
+    assert len(subscription_calls) == 1
+    assert subscription_calls[0][0] == response.id
 
 
 @pytest.mark.asyncio

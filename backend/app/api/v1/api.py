@@ -8,6 +8,7 @@ from app.modules.memberships.router import (
 )
 from app.modules.organizations.router import router as organizations_router
 from app.modules.plans.router import router as organization_plans_router
+from app.modules.subscriptions.router import router as organization_subscriptions_router
 
 router = APIRouter()
 router.include_router(health_router, tags=["health"])
@@ -19,6 +20,11 @@ router.include_router(
 )
 router.include_router(
     organization_plans_router,
+    prefix="/organizations",
+    tags=["organizations"],
+)
+router.include_router(
+    organization_subscriptions_router,
     prefix="/organizations",
     tags=["organizations"],
 )

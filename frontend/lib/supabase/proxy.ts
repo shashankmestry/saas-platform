@@ -53,9 +53,12 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isDashboardRoute =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isOrganizationRoute =
+    pathname === "/organizations" || pathname.startsWith("/organizations/");
   const isOnboardingRoute =
     pathname === "/onboarding" || pathname.startsWith("/onboarding/");
-  const isProtectedRoute = isDashboardRoute || isOnboardingRoute;
+  const isProtectedRoute =
+    isDashboardRoute || isOrganizationRoute || isOnboardingRoute;
   const isAuthPage =
     pathname === "/auth/login" || pathname === "/auth/register";
 
@@ -79,6 +82,7 @@ export async function updateSession(request: NextRequest) {
       const queryIndex = nextPath.indexOf("?");
       destination.search = queryIndex >= 0 ? nextPath.slice(queryIndex) : "";
     } else {
+      // Resolver picks the correct organization-scoped destination.
       destination.pathname = "/dashboard";
       destination.search = "";
     }

@@ -1,8 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -16,18 +17,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  setLastSelectedOrganizationSlug,
+  resolveInitialOrganizationSlug,
+} from "@/lib/organizations/active-organization";
+import { organizationHomePath } from "@/lib/organizations/paths";
+import {
   createOrganizationSchema,
   type CreateOrganizationFormValues,
 } from "@/lib/organizations/schemas";
+import { organizationKeys } from "@/lib/query-keys";
 import { createOrganization, listOrganizations } from "@/services/organizations";
 import { useAuthStore } from "@/store/auth";
 
-export function OnboardingForm() {
+function OnboardingFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const forceCreate = searchParams.get("new") === "1";
   const session = useAuthStore((state) => state.session);
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isCheckingOrgs, setIsCheckingOrgs] = useState(true);
+  const [isCheckingOrgs, setIsCheckingOrgs] = useState(!forceCreate);
 
   const {
     register,
@@ -50,6 +60,10 @@ export function OnboardingForm() {
       return;
     }
 
+    if (forceCreate) {
+      return;
+    }
+
     let isMounted = true;
 
     async function checkOrganizations() {
@@ -60,8 +74,12 @@ export function OnboardingForm() {
         }
 
         if (organizations.length > 0) {
-          router.replace("/dashboard");
-          return;
+          const slug = resolveInitialOrganizationSlug(organizations);
+          if (slug) {
+            setLastSelectedOrganizationSlug(slug);
+            router.replace(organizationHomePath(slug));
+            return;
+          }
         }
 
         setIsCheckingOrgs(false);
@@ -82,14 +100,16 @@ export function OnboardingForm() {
     return () => {
       isMounted = false;
     };
-  }, [isHydrated, router, session]);
+  }, [forceCreate, isHydrated, router, session]);
 
   async function onSubmit(values: CreateOrganizationFormValues) {
     setAuthError(null);
 
     try {
-      await createOrganization(values.name);
-      router.replace("/dashboard");
+      const organization = await createOrganization(values.name);
+      setLastSelectedOrganizationSlug(organization.slug);
+      await queryClient.invalidateQueries({ queryKey: organizationKeys.list() });
+      router.replace(organizationHomePath(organization.slug));
     } catch (error) {
       setAuthError(
         error instanceof Error
@@ -117,19 +137,14 @@ export function OnboardingForm() {
         <CardHeader>
           <CardTitle>Create your organization</CardTitle>
           <CardDescription>
-            Set up your workspace to continue using the platform.
+            Organizations are the top-level workspace for your team.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="space-y-2">
-              <Label htmlFor="name">Organization Name</Label>
-              <Input
-                id="name"
-                autoComplete="organization"
-                placeholder="Acme Technologies"
-                {...register("name")}
-              />
+              <Label htmlFor="name">Organization name</Label>
+              <Input id="name" autoComplete="organization" {...register("name")} />
               {errors.name ? (
                 <p className="text-destructive text-sm">{errors.name.message}</p>
               ) : null}
@@ -142,11 +157,25 @@ export function OnboardingForm() {
             ) : null}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Organization"}
+              {isSubmitting ? "Creating..." : "Create organization"}
             </Button>
           </form>
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export function OnboardingForm() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex flex-1 items-center justify-center px-6 py-16">
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        </main>
+      }
+    >
+      <OnboardingFormContent />
+    </Suspense>
   );
 }

@@ -13,6 +13,7 @@ from app.modules.memberships.models import (  # noqa: F401
 )
 from app.modules.organizations.models import Organization, OrganizationProfile  # noqa: F401
 from app.modules.plans.models import OrganizationPlan  # noqa: F401
+from app.modules.subscriptions.models import OrganizationSubscription  # noqa: F401
 from app.modules.users.models import User  # noqa: F401
 
 config = context.config

@@ -1,15 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { OrganizationLogoSection } from "@/components/common/organization-logo-section";
 import { OrganizationPlanSection } from "@/components/common/organization-plan-section";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { useOrganization } from "@/components/providers/organization-provider";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -19,7 +18,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useOrganizationPermissions } from "@/hooks/use-organization-permissions";
 import { OrganizationPermission } from "@/lib/auth/permissions";
 import {
   COUNTRY_OPTIONS,
@@ -32,12 +30,7 @@ import {
 } from "@/lib/organizations/profile-schema";
 import { organizationKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
-import {
-  getOrganizationProfile,
-  listOrganizations,
-  updateOrganizationProfile,
-} from "@/services/organizations";
-import { useAuthStore } from "@/store/auth";
+import { updateOrganizationProfile } from "@/services/organizations";
 
 const selectClassName = cn(
   "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none",
@@ -47,29 +40,13 @@ const selectClassName = cn(
 );
 
 export function OrganizationSettingsContent() {
-  const router = useRouter();
   const queryClient = useQueryClient();
-  const session = useAuthStore((state) => state.session);
-  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const { organization, profile, can, isLoading } = useOrganization();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const organizationsQuery = useQuery({
-    queryKey: organizationKeys.list(),
-    queryFn: listOrganizations,
-    enabled: isHydrated && Boolean(session),
-  });
-
-  const organization = organizationsQuery.data?.[0] ?? null;
-  const { can } = useOrganizationPermissions(organization);
   const canView = can(OrganizationPermission.ORGANIZATION_VIEW);
   const canManage = can(OrganizationPermission.ORGANIZATION_MANAGE);
-
-  const profileQuery = useQuery({
-    queryKey: organizationKeys.profile(organization?.id ?? ""),
-    queryFn: () => getOrganizationProfile(organization!.id),
-    enabled: Boolean(organization?.id) && canView,
-  });
 
   const {
     register,
@@ -91,25 +68,9 @@ export function OrganizationSettingsContent() {
   });
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!profile) {
       return;
     }
-    if (!session) {
-      router.replace("/auth/login");
-    }
-  }, [isHydrated, router, session]);
-
-  useEffect(() => {
-    if (organizationsQuery.isSuccess && (organizationsQuery.data?.length ?? 0) === 0) {
-      router.replace("/onboarding");
-    }
-  }, [organizationsQuery.data, organizationsQuery.isSuccess, router]);
-
-  useEffect(() => {
-    if (!profileQuery.data) {
-      return;
-    }
-    const profile = profileQuery.data;
     reset({
       name: profile.name,
       slug: profile.slug,
@@ -120,7 +81,7 @@ export function OrganizationSettingsContent() {
       timezone: profile.timezone ?? "",
       default_currency: profile.default_currency ?? "",
     });
-  }, [profileQuery.data, reset]);
+  }, [profile, reset]);
 
   const saveMutation = useMutation({
     mutationFn: (values: OrganizationProfileFormValues) =>
@@ -168,11 +129,6 @@ export function OrganizationSettingsContent() {
     saveMutation.mutate(values);
   }
 
-  const isLoading =
-    !isHydrated ||
-    (session &&
-      (organizationsQuery.isLoading || (canView && profileQuery.isLoading)));
-
   if (isLoading) {
     return (
       <main className="flex flex-1 items-center justify-center px-6 py-16">
@@ -181,11 +137,7 @@ export function OrganizationSettingsContent() {
     );
   }
 
-  if (!session) {
-    return null;
-  }
-
-  if (!canView) {
+  if (!organization || !canView) {
     return (
       <main className="flex flex-1 items-center justify-center px-6 py-16">
         <Card className="w-full max-w-lg">
@@ -195,33 +147,6 @@ export function OrganizationSettingsContent() {
               You do not have permission to view this organization&apos;s profile.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link href="/dashboard" className={cn(buttonVariants({ variant: "outline" }))}>
-              Back to dashboard
-            </Link>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
-
-  if (profileQuery.isError) {
-    return (
-      <main className="flex flex-1 items-center justify-center px-6 py-16">
-        <Card className="w-full max-w-lg">
-          <CardHeader>
-            <CardTitle>Organization settings</CardTitle>
-            <CardDescription>
-              {profileQuery.error instanceof Error
-                ? profileQuery.error.message
-                : "Unable to load organization profile"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/dashboard" className={cn(buttonVariants({ variant: "outline" }))}>
-              Back to dashboard
-            </Link>
-          </CardContent>
         </Card>
       </main>
     );
@@ -242,19 +167,15 @@ export function OrganizationSettingsContent() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
-            {organization ? (
-              <>
-                <OrganizationPlanSection
-                  organizationId={organization.id}
-                  enabled={canView}
-                />
-                <OrganizationLogoSection
-                  organizationId={organization.id}
-                  logoUrl={profileQuery.data?.logo_url ?? null}
-                  canManage={canManage}
-                />
-              </>
-            ) : null}
+            <OrganizationPlanSection
+              organizationId={organization.id}
+              enabled={canView}
+            />
+            <OrganizationLogoSection
+              organizationId={organization.id}
+              logoUrl={profile?.logo_url ?? null}
+              canManage={canManage}
+            />
 
             <div className="space-y-2">
               <Label htmlFor="name">Organization Name</Label>
@@ -377,27 +298,16 @@ export function OrganizationSettingsContent() {
               </p>
             ) : null}
             {success ? (
-              <p className="text-sm text-muted-foreground" role="status">
+              <p className="text-muted-foreground text-sm" role="status">
                 {success}
               </p>
             ) : null}
 
-            <div className="flex flex-wrap gap-3">
-              {canManage ? (
-                <Button
-                  type="submit"
-                  disabled={saveMutation.isPending || !isDirty}
-                >
-                  {saveMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              ) : null}
-              <Link
-                href="/dashboard"
-                className={cn(buttonVariants({ variant: "outline" }))}
-              >
-                Back to dashboard
-              </Link>
-            </div>
+            {canManage ? (
+              <Button type="submit" disabled={saveMutation.isPending || !isDirty}>
+                {saveMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            ) : null}
           </form>
         </CardContent>
       </Card>

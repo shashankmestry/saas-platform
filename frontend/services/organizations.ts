@@ -8,6 +8,7 @@ import type {
   OrganizationPlan,
   OrganizationProfile,
   OrganizationProfileUpdate,
+  OrganizationSubscription,
 } from "@/types";
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -140,5 +141,20 @@ export async function getOrganizationPlan(
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error, "Unable to load organization plan"));
+  }
+}
+
+export async function getOrganizationSubscription(
+  organizationId: string,
+): Promise<OrganizationSubscription> {
+  try {
+    const response = await apiClient.get<OrganizationSubscription>(
+      `/api/v1/organizations/${organizationId}/subscription`,
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      getErrorMessage(error, "Unable to load organization subscription"),
+    );
   }
 }

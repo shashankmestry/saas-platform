@@ -16,6 +16,8 @@ from app.modules.organizations.repository import (
 )
 from app.modules.organizations.service import OrganizationService
 from app.modules.plans.repository import OrganizationPlanRepository
+from app.modules.subscriptions.dependencies import get_subscription_service
+from app.modules.subscriptions.service import SubscriptionService
 
 
 async def get_organization_repository(
@@ -66,6 +68,10 @@ async def get_organization_service(
         OrganizationPlanRepository,
         Depends(get_organization_plan_repository),
     ],
+    subscription_service: Annotated[
+        SubscriptionService,
+        Depends(get_subscription_service),
+    ],
     storage: Annotated[
         OrganizationAssetsStorage,
         Depends(get_organization_storage),
@@ -77,5 +83,6 @@ async def get_organization_service(
         membership_repository=membership_repository,
         profile_repository=profile_repository,
         plan_repository=plan_repository,
+        subscription_service=subscription_service,
         storage=storage,
     )

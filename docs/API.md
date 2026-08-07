@@ -314,6 +314,44 @@ active memberships + active pending invitations
 
 ---
 
+### `GET /api/v1/organizations/{organization_id}/subscription`
+
+Returns the organization's commercial subscription state.
+
+Requires `organization.view`.
+
+This endpoint is provider-independent. Provider customer/subscription IDs are
+never exposed. Application entitlements continue to use
+`GET .../plan` / `OrganizationPlan`.
+
+There is no public HTTP endpoint to mutate subscriptions in this step.
+
+**Auth:** required (`Bearer` token)
+
+**Response `200`**
+
+```json
+{
+  "plan": "free",
+  "status": "active",
+  "provider": "none",
+  "billing_interval": "monthly",
+  "current_period_start": "2026-08-07T10:00:00Z",
+  "current_period_end": "2026-09-06T10:00:00Z",
+  "cancel_at_period_end": false
+}
+```
+
+**Errors**
+
+| Status | When |
+| ------ | ---- |
+| `401` | Missing, invalid, or expired token |
+| `403` | Not a member, or missing `organization.view` |
+| `404` | Subscription assignment missing |
+
+---
+
 ### `POST /api/v1/organizations/{organization_id}/logo/upload`
 
 Authorizes a short-lived Supabase Storage signed upload for an organization

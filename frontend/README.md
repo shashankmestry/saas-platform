@@ -81,7 +81,8 @@ frontend/
 |   |-- (public)/
 |   |-- (auth)/auth/login/
 |   |-- (auth)/auth/register/
-|   |-- (dashboard)/dashboard/
+|   |-- (dashboard)/dashboard/          # post-login resolver
+|   |-- (dashboard)/organizations/[slug]/
 |   |-- (dashboard)/onboarding/
 |   `-- api/
 |-- components/
@@ -112,18 +113,28 @@ frontend/
 - `/auth/login` — sign in
 - `/auth/register` — create account (email verification required)
 - `/auth/callback` — email verification return URL
-- `/onboarding` — create organization when the user has none
-- `/dashboard` — temporary authenticated dashboard (shows organization name)
-- `/dashboard/members` — members, pending invitations, invite form
+- `/onboarding` — create organization (`?new=1` forces create when already a member)
+- `/dashboard` — resolves to an organization (or `/onboarding` when none)
+- `/organizations/[slug]/dashboard` — organization home
+- `/organizations/[slug]/members` — members and invitations
+- `/organizations/[slug]/settings` — organization profile / logo / plan
+- `/organizations/[slug]/billing` — subscription summary
 - `/invitations/accept` — accept invitation via `?token=`
+
+Legacy `/dashboard/members`, `/dashboard/settings/organization`, and
+`/dashboard/billing` redirect into the matching organization-scoped route.
+
+Current organization is UI state derived from the route slug (and a
+`localStorage` preference for first login). It is not stored in JWTs or
+backend sessions.
 
 ## Session persistence
 
 - Browser client: `lib/supabase/client.ts` (`@supabase/ssr` cookies)
 - Server client: `lib/supabase/server.ts`
 - Proxy: `proxy.ts` + `lib/supabase/proxy.ts` refreshes/validates the session with
-  `getClaims()` and redirects unauthenticated users away from `/dashboard` and
-  `/onboarding`
+  `getClaims()` and redirects unauthenticated users away from `/dashboard`,
+  `/organizations/*`, and `/onboarding`
 - Axios reads the access token from the current Supabase session on each request
 
 ## Email verification
@@ -133,7 +144,8 @@ frontend/
 3. Supabase sends a verification email with redirect to `/auth/callback`
 4. The server route exchanges the auth code for a session
 5. Backend `GET /api/v1/auth/me` runs JIT provisioning
-6. User is redirected to `/dashboard` (then `/onboarding` if they have no organization)
+6. User is redirected to `/dashboard`, which opens their organization (or
+   `/onboarding` if they have none)
 
 Add this redirect URL in the Supabase dashboard under Authentication → URL configuration:
 

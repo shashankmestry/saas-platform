@@ -40,6 +40,7 @@ The API will be available at:
 | `GET` | `/api/v1/organizations/{id}/profile` | Bearer JWT | Organization profile (`organization.view`) |
 | `PATCH` | `/api/v1/organizations/{id}/profile` | Bearer JWT | Update organization profile (`organization.manage`) |
 | `GET` | `/api/v1/organizations/{id}/plan` | Bearer JWT | Organization plan & entitlements (`organization.view`) |
+| `GET` | `/api/v1/organizations/{id}/subscription` | Bearer JWT | Organization subscription (`organization.view`) |
 | `POST` | `/api/v1/organizations/{id}/logo/upload` | Bearer JWT | Request logo upload authorization (`organization.manage`) |
 | `POST` | `/api/v1/organizations/{id}/logo/confirm` | Bearer JWT | Confirm logo upload (`organization.manage`) |
 | `DELETE` | `/api/v1/organizations/{id}/logo` | Bearer JWT | Remove organization logo (`organization.manage`) |

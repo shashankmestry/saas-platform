@@ -1,5 +1,5 @@
-import { MembersPageContent } from "@/components/common/members-page-content";
+import { LegacyOrganizationRedirect } from "@/components/common/legacy-organization-redirect";
 
-export default function MembersPage() {
-  return <MembersPageContent />;
+export default function LegacyMembersPage() {
+  return <LegacyOrganizationRedirect section="members" />;
 }

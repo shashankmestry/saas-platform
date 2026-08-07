@@ -1,19 +1,24 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import {
   resolveInitialOrganizationSlug,
   setLastSelectedOrganizationSlug,
 } from "@/lib/organizations/active-organization";
-import { organizationHomePath } from "@/lib/organizations/paths";
+import { organizationSectionPath } from "@/lib/organizations/paths";
 import { listOrganizations } from "@/services/organizations";
 import { useAuthStore } from "@/store/auth";
 
-function DashboardResolverContent() {
+type LegacyOrganizationRedirectProps = {
+  section: "dashboard" | "members" | "settings" | "billing";
+};
+
+export function LegacyOrganizationRedirect({
+  section,
+}: LegacyOrganizationRedirectProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const session = useAuthStore((state) => state.session);
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +27,6 @@ function DashboardResolverContent() {
     if (!isHydrated) {
       return;
     }
-
     if (!session) {
       router.replace("/auth/login");
       return;
@@ -36,21 +40,17 @@ function DashboardResolverContent() {
         if (!isMounted) {
           return;
         }
-
         if (organizations.length === 0) {
           router.replace("/onboarding");
           return;
         }
-
         const slug = resolveInitialOrganizationSlug(organizations);
         if (!slug) {
           router.replace("/onboarding");
           return;
         }
-
         setLastSelectedOrganizationSlug(slug);
-        const verified = searchParams.get("verified") === "1" ? "?verified=1" : "";
-        router.replace(`${organizationHomePath(slug)}${verified}`);
+        router.replace(organizationSectionPath(slug, section));
       } catch (loadError) {
         if (isMounted) {
           setError(
@@ -63,31 +63,16 @@ function DashboardResolverContent() {
     }
 
     void resolve();
-
     return () => {
       isMounted = false;
     };
-  }, [isHydrated, router, searchParams, session]);
+  }, [isHydrated, router, section, session]);
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
       <p className="text-muted-foreground text-sm" role={error ? "alert" : "status"}>
-        {error ?? "Opening your organization..."}
+        {error ?? "Redirecting..."}
       </p>
     </main>
-  );
-}
-
-export default function DashboardResolverPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="flex flex-1 items-center justify-center px-6 py-16">
-          <p className="text-muted-foreground text-sm">Opening your organization...</p>
-        </main>
-      }
-    >
-      <DashboardResolverContent />
-    </Suspense>
   );
 }

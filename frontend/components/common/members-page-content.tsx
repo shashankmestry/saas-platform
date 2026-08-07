@@ -2,12 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { useOrganization } from "@/components/providers/organization-provider";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -17,7 +16,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useOrganizationPermissions } from "@/hooks/use-organization-permissions";
 import {
   OrganizationPermission,
   OrganizationRole,
@@ -27,7 +25,6 @@ import {
   type InviteMemberFormValues,
 } from "@/lib/organizations/invite-schema";
 import { membershipKeys, organizationKeys } from "@/lib/query-keys";
-import { cn } from "@/lib/utils";
 import {
   createOrganizationInvitation,
   listOrganizationInvitations,
@@ -37,7 +34,6 @@ import {
   transferOwnership,
   updateMemberRole,
 } from "@/services/memberships";
-import { listOrganizations } from "@/services/organizations";
 import { useAuthStore } from "@/store/auth";
 import type { OrganizationMember } from "@/types";
 
@@ -50,23 +46,12 @@ function formatExpiry(value: string): string {
 }
 
 export function MembersPageContent() {
-  const router = useRouter();
   const queryClient = useQueryClient();
-  const session = useAuthStore((state) => state.session);
   const currentUser = useAuthStore((state) => state.user);
-  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const { organization, can, invalidateOrganizationQueries } = useOrganization();
   const [error, setError] = useState<string | null>(null);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [transferTargetId, setTransferTargetId] = useState("");
-
-  const organizationsQuery = useQuery({
-    queryKey: organizationKeys.list(),
-    queryFn: listOrganizations,
-    enabled: isHydrated && Boolean(session),
-  });
-
-  const organization = organizationsQuery.data?.[0] ?? null;
-  const { can } = useOrganizationPermissions(organization);
 
   const canViewMembers = can(OrganizationPermission.MEMBER_VIEW);
   const canViewInvitations = can(OrganizationPermission.INVITATION_VIEW);
@@ -100,36 +85,21 @@ export function MembersPageContent() {
     },
   });
 
-  useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-    if (!session) {
-      router.replace("/auth/login");
-    }
-  }, [isHydrated, router, session]);
-
-  useEffect(() => {
-    if (organizationsQuery.isSuccess && (organizationsQuery.data?.length ?? 0) === 0) {
-      router.replace("/onboarding");
-    }
-  }, [organizationsQuery.data, organizationsQuery.isSuccess, router]);
-
   async function invalidateMembershipData() {
     if (!organization) {
       return;
     }
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: organizationKeys.list() }),
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.plan(organization.id),
-      }),
       queryClient.invalidateQueries({
         queryKey: membershipKeys.members(organization.id),
       }),
       queryClient.invalidateQueries({
         queryKey: membershipKeys.invitations(organization.id),
       }),
+      queryClient.invalidateQueries({
+        queryKey: organizationKeys.plan(organization.id),
+      }),
+      queryClient.invalidateQueries({ queryKey: organizationKeys.list() }),
     ]);
   }
 
@@ -174,6 +144,7 @@ export function MembersPageContent() {
     onSuccess: async () => {
       setError(null);
       await invalidateMembershipData();
+      await invalidateOrganizationQueries();
     },
     onError: (roleError: Error) => {
       setError(roleError.message);
@@ -199,6 +170,7 @@ export function MembersPageContent() {
       setError(null);
       setTransferTargetId("");
       await invalidateMembershipData();
+      await invalidateOrganizationQueries();
     },
     onError: (transferError: Error) => {
       setError(transferError.message);
@@ -210,9 +182,11 @@ export function MembersPageContent() {
     return members.filter((member) => member.user_id !== currentUser?.id);
   }, [currentUser?.id, membersQuery.data]);
 
+  if (!organization) {
+    return null;
+  }
+
   const isLoading =
-    !isHydrated ||
-    organizationsQuery.isLoading ||
     (canViewMembers && membersQuery.isLoading) ||
     (canViewInvitations && invitationsQuery.isLoading);
 
@@ -224,15 +198,9 @@ export function MembersPageContent() {
     );
   }
 
-  if (!session) {
-    return null;
-  }
-
   function confirmAndUpdateRole(member: OrganizationMember, role: "owner" | "member") {
     const label = role === "owner" ? "owner" : "member";
-    const confirmed = window.confirm(
-      `Change ${member.email} to ${label}?`,
-    );
+    const confirmed = window.confirm(`Change ${member.email} to ${label}?`);
     if (!confirmed) {
       return;
     }
@@ -265,16 +233,9 @@ export function MembersPageContent() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-12">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-          <p className="text-muted-foreground text-sm">
-            {organization?.name ?? "Organization"}
-          </p>
-        </div>
-        <Link href="/dashboard" className={cn(buttonVariants({ variant: "outline" }))}>
-          Back to dashboard
-        </Link>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
+        <p className="text-muted-foreground text-sm">{organization.name}</p>
       </div>
 
       {error ? (
@@ -302,46 +263,43 @@ export function MembersPageContent() {
               (membersQuery.data ?? []).map((member) => (
                 <div
                   key={member.id}
-                  className="flex flex-col gap-2 border-b border-border py-3 last:border-b-0"
+                  className="flex flex-col gap-2 border-b border-border py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-1">
-                    <p className="font-medium">
-                      {member.display_name?.trim() || member.email}
-                    </p>
+                  <div>
+                    <p className="font-medium">{member.display_name ?? member.email}</p>
                     <p className="text-muted-foreground text-sm">{member.email}</p>
-                    <p className="text-sm capitalize">{member.role}</p>
+                    <p className="text-muted-foreground text-xs capitalize">{member.role}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {canUpdateRole && member.role !== OrganizationRole.OWNER ? (
                       <Button
+                        type="button"
                         variant="outline"
                         size="sm"
+                        onClick={() => confirmAndUpdateRole(member, "owner")}
                         disabled={roleMutation.isPending}
-                        onClick={() =>
-                          confirmAndUpdateRole(member, OrganizationRole.OWNER)
-                        }
                       >
                         Make owner
                       </Button>
                     ) : null}
-                    {canUpdateRole && member.role !== OrganizationRole.MEMBER ? (
+                    {canUpdateRole && member.role === OrganizationRole.OWNER ? (
                       <Button
+                        type="button"
                         variant="outline"
                         size="sm"
+                        onClick={() => confirmAndUpdateRole(member, "member")}
                         disabled={roleMutation.isPending}
-                        onClick={() =>
-                          confirmAndUpdateRole(member, OrganizationRole.MEMBER)
-                        }
                       >
                         Make member
                       </Button>
                     ) : null}
                     {canRemove && member.user_id !== currentUser?.id ? (
                       <Button
+                        type="button"
                         variant="outline"
                         size="sm"
-                        disabled={removeMutation.isPending}
                         onClick={() => confirmAndRemove(member)}
+                        disabled={removeMutation.isPending}
                       >
                         Remove
                       </Button>
@@ -352,44 +310,31 @@ export function MembersPageContent() {
             )}
           </CardContent>
         </Card>
-      ) : (
-        <p className="text-muted-foreground text-sm">
-          You do not have permission to view members.
-        </p>
-      )}
+      ) : null}
 
-      {canTransfer ? (
+      {canInvite ? (
         <Card>
           <CardHeader>
-            <CardTitle>Transfer ownership</CardTitle>
-            <CardDescription>
-              Promote another member to owner and demote yourself to member.
-            </CardDescription>
+            <CardTitle>Invite member</CardTitle>
+            <CardDescription>Send an invitation by email.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="transferTarget">New owner</Label>
-              <select
-                id="transferTarget"
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                value={transferTargetId}
-                onChange={(event) => setTransferTargetId(event.target.value)}
-              >
-                <option value="">Select a member</option>
-                {transferCandidates.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.email} ({member.role})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <Button
-              type="button"
-              disabled={!transferTargetId || transferMutation.isPending}
-              onClick={confirmAndTransfer}
+          <CardContent>
+            <form
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+              onSubmit={handleSubmit((values) => inviteMutation.mutate(values.email))}
+              noValidate
             >
-              {transferMutation.isPending ? "Transferring..." : "Transfer ownership"}
-            </Button>
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" {...register("email")} />
+                {errors.email ? (
+                  <p className="text-destructive text-sm">{errors.email.message}</p>
+                ) : null}
+              </div>
+              <Button type="submit" disabled={isSubmitting || inviteMutation.isPending}>
+                {inviteMutation.isPending ? "Inviting..." : "Invite"}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       ) : null}
@@ -397,8 +342,8 @@ export function MembersPageContent() {
       {canViewInvitations ? (
         <Card>
           <CardHeader>
-            <CardTitle>Pending Invitations</CardTitle>
-            <CardDescription>Invitations waiting to be accepted.</CardDescription>
+            <CardTitle>Pending invitations</CardTitle>
+            <CardDescription>Invitations that have not been accepted yet.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {(invitationsQuery.data?.length ?? 0) === 0 ? (
@@ -407,23 +352,23 @@ export function MembersPageContent() {
               (invitationsQuery.data ?? []).map((invitation) => (
                 <div
                   key={invitation.id}
-                  className="flex flex-col gap-2 border-b border-border py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 border-b border-border py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-1">
+                  <div>
                     <p className="font-medium">{invitation.email}</p>
-                    <p className="text-sm capitalize">{invitation.role}</p>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-muted-foreground text-xs">
                       Expires {formatExpiry(invitation.expires_at)}
                     </p>
                   </div>
                   {canRevoke ? (
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
-                      disabled={revokeMutation.isPending}
                       onClick={() => revokeMutation.mutate(invitation.id)}
+                      disabled={revokeMutation.isPending}
                     >
-                      {revokeMutation.isPending ? "Revoking..." : "Revoke"}
+                      Revoke
                     </Button>
                   ) : null}
                 </div>
@@ -433,43 +378,39 @@ export function MembersPageContent() {
         </Card>
       ) : null}
 
-      {canInvite ? (
+      {canTransfer ? (
         <Card>
           <CardHeader>
-            <CardTitle>Invite Member</CardTitle>
+            <CardTitle>Transfer ownership</CardTitle>
             <CardDescription>
-              Invite someone by email. They will join as a member.
+              Choose another member to become the organization owner.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form
-              className="space-y-4"
-              onSubmit={handleSubmit((values) => {
-                setInviteNotice(null);
-                inviteMutation.mutate(values.email);
-              })}
-              noValidate
-            >
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="person@example.com"
-                  {...register("email")}
-                />
-                {errors.email ? (
-                  <p className="text-destructive text-sm">{errors.email.message}</p>
-                ) : null}
-              </div>
-              <Button
-                type="submit"
-                disabled={isSubmitting || inviteMutation.isPending}
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="transferTarget">New owner</Label>
+              <select
+                id="transferTarget"
+                className="border-input h-8 w-full rounded-lg border bg-transparent px-2.5 text-sm"
+                value={transferTargetId}
+                onChange={(event) => setTransferTargetId(event.target.value)}
               >
-                {inviteMutation.isPending ? "Inviting..." : "Invite"}
-              </Button>
-            </form>
+                <option value="">Select member</option>
+                {transferCandidates.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!transferTargetId || transferMutation.isPending}
+              onClick={confirmAndTransfer}
+            >
+              {transferMutation.isPending ? "Transferring..." : "Transfer"}
+            </Button>
           </CardContent>
         </Card>
       ) : null}

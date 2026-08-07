@@ -28,6 +28,8 @@ export type {
 
 export type { OrganizationPlan } from "@/types/organization-plan";
 
+export type { OrganizationSubscription } from "@/types/organization-subscription";
+
 export type OrganizationMember = {
   id: string;
   user_id: string;

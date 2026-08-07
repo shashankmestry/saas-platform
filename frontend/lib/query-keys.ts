@@ -1,16 +1,19 @@
 export const organizationKeys = {
   all: ["organizations"] as const,
   list: () => [...organizationKeys.all, "list"] as const,
+  detail: (organizationId: string) =>
+    [...organizationKeys.all, "detail", organizationId] as const,
   profile: (organizationId: string) =>
-    [...organizationKeys.all, "profile", organizationId] as const,
-  plan: (organizationId: string) =>
-    [...organizationKeys.all, "plan", organizationId] as const,
+    ["profile", organizationId] as const,
+  plan: (organizationId: string) => ["plan", organizationId] as const,
+  subscription: (organizationId: string) =>
+    ["subscription", organizationId] as const,
 };
 
 export const membershipKeys = {
   all: ["memberships"] as const,
   members: (organizationId: string) =>
-    [...membershipKeys.all, "members", organizationId] as const,
+    ["members", organizationId] as const,
   invitations: (organizationId: string) =>
-    [...membershipKeys.all, "invitations", organizationId] as const,
+    ["invitations", organizationId] as const,
 };

@@ -35,6 +35,7 @@ from app.modules.organizations.schemas import (
 )
 from app.modules.plans.models import OrganizationPlan
 from app.modules.plans.repository import OrganizationPlanRepository
+from app.modules.subscriptions.service import SubscriptionService
 from app.modules.users.models import User
 
 
@@ -53,6 +54,7 @@ class OrganizationService:
         membership_repository: MembershipRepository,
         profile_repository: OrganizationProfileRepository,
         plan_repository: OrganizationPlanRepository,
+        subscription_service: SubscriptionService,
         storage: OrganizationAssetsStorage,
     ) -> None:
         self._session = session
@@ -60,6 +62,7 @@ class OrganizationService:
         self._membership_repository = membership_repository
         self._profile_repository = profile_repository
         self._plan_repository = plan_repository
+        self._subscription_service = subscription_service
         self._storage = storage
 
     async def list_for_user(self, user: User) -> list[OrganizationResponse]:
@@ -102,6 +105,10 @@ class OrganizationService:
                         organization_id=organization.id,
                         plan_key=PlanKey.FREE.value,
                     )
+                )
+                await self._subscription_service.create_initial_subscription(
+                    organization.id,
+                    plan_key=PlanKey.FREE,
                 )
                 await self._session.commit()
                 await self._session.refresh(organization)
